@@ -444,48 +444,101 @@ mod test {
 
     #[test]
     fn test_subtitude() {
+        let order = Order::Default;
+
         assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &Order::Default).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order).unwrap());
         assert_eq!(
             "가긔기다듸디아의이차츼치",
-            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &Order::Default).unwrap()
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order).unwrap()
         );
 
         assert_eq!(
             "다닥닦닧단닩닪닫달닭닮닯닰닱닲닳담답닶닷닸당닺닻닼닽닾닿",
-            substitute("ㄷ", "ㅏ", "", &Order::Default).unwrap()
+            substitute("ㄷ", "ㅏ", "", &order).unwrap()
         );
         assert_eq!(
             "닿댛댷덓덯뎋뎧돃돟돻됗됳둏둫뒇뒣뒿듛듷딓딯",
-            substitute("ㄷ", "", "ㅎ", &Order::Default).unwrap()
+            substitute("ㄷ", "", "ㅎ", &order).unwrap()
         );
         assert_eq!(
             "갛깧낳닿땋랗맣밯빻샇쌓앟잫짷챃캏탛팧핳",
-            substitute("", "ㅏ", "ㅎ", &Order::Default).unwrap()
+            substitute("", "ㅏ", "ㅎ", &order).unwrap()
         );
 
         assert_eq!(
             "ㄱㄷㅇㅊ",
-            substitute("ㄱㄷㅊㅇ", "0", "0", &Order::Default).unwrap()
+            substitute("ㄱㄷㅊㅇ", "0", "0", &order).unwrap()
         );
         assert_eq!(
             "ㅏㅗㅢ",
-            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &Order::Default).unwrap()
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order).unwrap()
         );
         assert_eq!(
             "ㄼㅅㅆㅇ",
-            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &Order::Default).unwrap()
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order).unwrap()
         );
 
-        match substitute("0", "0", "0", &Order::Default).unwrap_err() {
+        match substitute("0", "0", "0", &order).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("0", "ㅏ", "ㅁ", &Order::Default).unwrap_err() {
+        match substitute("0", "ㅏ", "ㅁ", &order).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("ㅎ", "0", "ㅁ", &Order::Default).unwrap_err() {
+        match substitute("ㅎ", "0", "ㅁ", &order).unwrap_err() {
+            KoreanRegexError::InvalidZeroPatternError(_) => (),
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
+        }
+    }
+
+    #[test]
+    fn test_subtitude_with_regular_first_order() {
+        let order = Order::RegularFirst;
+
+        assert_eq!("가각갖갋기긱깆긻긔긕긪긟다닥닺닯디딕딪딟듸듹딎딃아악앚앏이익잊읿의읙읮읣차착찾찳치칙칮칣츼츽칒칇",
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order).unwrap());
+        assert_eq!(
+            "가기긔다디듸아이의차치츼",
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order).unwrap()
+        );
+
+        assert_eq!(
+            "다닥단닫달담답닷당닺닻닼닽닾닿닦닧닩닪닭닮닯닰닱닲닳닶닸",
+            substitute("ㄷ", "ㅏ", "", &order).unwrap()
+        );
+        assert_eq!(
+            "닿댷덯뎧돟둏둫듛듷딯댛덓뎋돃돻됗됳뒇뒣뒿딓",
+            substitute("ㄷ", "", "ㅎ", &order).unwrap()
+        );
+        assert_eq!(
+            "갛낳닿랗맣밯샇앟잫챃캏탛팧핳깧땋빻쌓짷",
+            substitute("", "ㅏ", "ㅎ", &order).unwrap()
+        );
+
+        assert_eq!(
+            "ㄱㄷㅇㅊ",
+            substitute("ㄱㄷㅊㅇ", "0", "0", &order).unwrap()
+        );
+        assert_eq!(
+            "ㅏㅗㅢ",
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order).unwrap()
+        );
+        assert_eq!(
+            "ㅅㅇㄼㅆ",
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order).unwrap()
+        );
+
+        match substitute("0", "0", "0", &order).unwrap_err() {
+            KoreanRegexError::InvalidZeroPatternError(_) => (),
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
+        }
+        match substitute("0", "ㅏ", "ㅁ", &order).unwrap_err() {
+            KoreanRegexError::InvalidZeroPatternError(_) => (),
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
+        }
+        match substitute("ㅎ", "0", "ㅁ", &order).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
