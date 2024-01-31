@@ -1,10 +1,10 @@
 use crate::{KoreanRegexError, Order};
 
 /// 이 크레이트에는 일부 조합형 글자를 괄호를 통해 표시하는 것이 가능합니다.
-/// 
+///
 /// 예를 들어 `ㅢ`의 경우 `(ㅡㅣ)`로 표시할 수 있고, `ㄼ`의 경우 `ㄹㅂ`으로 표시할 수 있습니다.
 /// 이는 글자 입력기가 조합을 지원하지 않는 경우 유용하게 사용할 수 있습니다.
-/// 
+///
 /// ```rust
 /// use korean_regex::*;
 /// assert_eq!("[깕깗끩끫낅낇딹딻띍띏띩띫]",
@@ -16,97 +16,108 @@ fn convert_parenthesized_string(parenthesized_string: &str) -> Result<Vec<char>,
     let mut unparenthesized_chars = Vec::new();
     for char in parenthesized_string.chars() {
         match char {
-            '(' => if does_inside_parenthisis {
-                return Err(KoreanRegexError::UnparenthesizingFailedError(
-                    "Invalid Syntax: Open parenthesis after another open parenthesis.".to_string()))
-            } else {
-                does_inside_parenthisis = true
-            },
-            ')' => if does_inside_parenthisis {
-                does_inside_parenthisis = false;
-                let converted_char = match chars_inside_parenthesis.as_str() {
-                    "ㅗㅏ" => 'ㅘ',
-                    "ㅗㅐ" => 'ㅙ',
-                    "ㅗㅣ" => 'ㅚ',
-                    "ㅜㅓ" => 'ㅝ',
-                    "ㅜㅔ" => 'ㅞ',
-                    "ㅜㅣ" => 'ㅟ',
-                    "ㅡㅣ" => 'ㅢ',
-                    "ㄱㅅ" => 'ㄳ',
-                    "ㄴㅈ" => 'ㄵ',
-                    "ㄴㅎ" => 'ㄶ',
-                    "ㄹㄱ" => 'ㄺ',
-                    "ㄹㅁ" => 'ㄻ',
-                    "ㄹㅂ" => 'ㄼ',
-                    "ㄹㅅ" => 'ㄽ',
-                    "ㄹㅌ" => 'ㄾ',
-                    "ㄹㅎ" => 'ㅀ',
-                    "ㅂㅅ" => 'ㅄ',
-                    "ㄱㄱ" => 'ㄲ',
-                    "ㄷㄷ" => 'ㄸ',
-                    "ㅈㅈ" => 'ㅉ',
-                    "ㅂㅂ" => 'ㅃ',
-                    other => {
-                        return Err(KoreanRegexError::UnparenthesizingFailedError(
-                            format!("Invalid Syntax: Unknown item inside parenthesis({}).", other)));
-                    }
-                };
-                chars_inside_parenthesis.clear();
-                unparenthesized_chars.push(converted_char);
-            } else {
-                return Err(KoreanRegexError::UnparenthesizingFailedError(
-                                    "Invalid Syntax: Close parenthesis after another close parenthesis.".to_string()))
-            },
-            others => if does_inside_parenthisis {
-                chars_inside_parenthesis.push(others)
-            } else {
-                unparenthesized_chars.push(others)
-            },
+            '(' => {
+                if does_inside_parenthisis {
+                    return Err(KoreanRegexError::UnparenthesizingFailedError(
+                        "Invalid Syntax: Open parenthesis after another open parenthesis."
+                            .to_string(),
+                    ));
+                } else {
+                    does_inside_parenthisis = true
+                }
+            }
+            ')' => {
+                if does_inside_parenthisis {
+                    does_inside_parenthisis = false;
+                    let converted_char = match chars_inside_parenthesis.as_str() {
+                        "ㅗㅏ" => 'ㅘ',
+                        "ㅗㅐ" => 'ㅙ',
+                        "ㅗㅣ" => 'ㅚ',
+                        "ㅜㅓ" => 'ㅝ',
+                        "ㅜㅔ" => 'ㅞ',
+                        "ㅜㅣ" => 'ㅟ',
+                        "ㅡㅣ" => 'ㅢ',
+                        "ㄱㅅ" => 'ㄳ',
+                        "ㄴㅈ" => 'ㄵ',
+                        "ㄴㅎ" => 'ㄶ',
+                        "ㄹㄱ" => 'ㄺ',
+                        "ㄹㅁ" => 'ㄻ',
+                        "ㄹㅂ" => 'ㄼ',
+                        "ㄹㅅ" => 'ㄽ',
+                        "ㄹㅌ" => 'ㄾ',
+                        "ㄹㅎ" => 'ㅀ',
+                        "ㅂㅅ" => 'ㅄ',
+                        "ㄱㄱ" => 'ㄲ',
+                        "ㄷㄷ" => 'ㄸ',
+                        "ㅈㅈ" => 'ㅉ',
+                        "ㅂㅂ" => 'ㅃ',
+                        other => {
+                            return Err(KoreanRegexError::UnparenthesizingFailedError(format!(
+                                "Invalid Syntax: Unknown item inside parenthesis({}).",
+                                other
+                            )));
+                        }
+                    };
+                    chars_inside_parenthesis.clear();
+                    unparenthesized_chars.push(converted_char);
+                } else {
+                    return Err(KoreanRegexError::UnparenthesizingFailedError(
+                        "Invalid Syntax: Close parenthesis after another close parenthesis."
+                            .to_string(),
+                    ));
+                }
+            }
+            others => {
+                if does_inside_parenthisis {
+                    chars_inside_parenthesis.push(others)
+                } else {
+                    unparenthesized_chars.push(others)
+                }
+            }
         }
     }
     Ok(unparenthesized_chars)
 }
 
-
 /// 이 함수는 다음과 같은 일을 합니다.
-/// 
+///
 /// 1. hyphen이 이용된 경우 풀어 씁니다.
 /// 1. 함수를 orders의 순서대로 정렬합니다.
 /// 1. 같은 글자가 있을 경우 중복을 제거합니다.
 /// 1. 만약 inverse=True일 경우 결과값을 뒤집습니다.
-fn sanitize(unsanitized_chars: Vec<char>, order: &Vec<char>, inverse: bool) -> Result<String, KoreanRegexError> {
+fn sanitize(
+    unsanitized_chars: Vec<char>,
+    order: &Vec<char>,
+    inverse: bool,
+) -> Result<String, KoreanRegexError> {
     fn add_chars_in_range(
         char_present_table: &mut Vec<bool>,
         char_before_hyphen: char,
         char_after_hyphen: char,
         order: &[char],
     ) -> Result<(), KoreanRegexError> {
-        let before_letter_index =
-            order
-            .iter()
-            .position(|&r| r == char_before_hyphen)
-            .ok_or(KoreanRegexError::InvalidPhonemeError(
+        let before_letter_index = order.iter().position(|&r| r == char_before_hyphen).ok_or(
+            KoreanRegexError::InvalidPhonemeError(
                 format!("Charactor `{}` is not valid phoneme.", char_before_hyphen),
                 char_before_hyphen,
-            ))?;
-        let after_letter_index =
-            order
-            .iter()
-            .position(|&r| r == char_after_hyphen)
-            .ok_or(KoreanRegexError::InvalidPhonemeError(
+            ),
+        )?;
+        let after_letter_index = order.iter().position(|&r| r == char_after_hyphen).ok_or(
+            KoreanRegexError::InvalidPhonemeError(
                 format!("Charactor `{}` is not valid phoneme.", char_after_hyphen),
                 char_before_hyphen,
-            ))?;
+            ),
+        )?;
 
         if before_letter_index > after_letter_index {
-            return Err(KoreanRegexError::InvalidHyphenError(
-                format!("The charactor before hyphen({char_before_hyphen}) is bigger than\
-                         the charactor after it({char_after_hyphen}).")
-            ));
+            return Err(KoreanRegexError::InvalidHyphenError(format!(
+                "The charactor before hyphen({char_before_hyphen}) is bigger than\
+                         the charactor after it({char_after_hyphen})."
+            )));
         }
 
         #[allow(clippy::needless_range_loop)]
-        for j in before_letter_index+1..after_letter_index {
+        for j in before_letter_index + 1..after_letter_index {
             char_present_table[j] = true;
         }
         Ok(())
@@ -118,13 +129,20 @@ fn sanitize(unsanitized_chars: Vec<char>, order: &Vec<char>, inverse: bool) -> R
             for (order_index, char_in_order) in order.iter().enumerate() {
                 if unsanitized_char == &'-' {
                     if char_index >= unsanitized_chars.len() - 1 || char_index == 0 {
-                        return Err(KoreanRegexError::InvalidHyphenError("Position of hyphen is invalid.".to_string()))
+                        return Err(KoreanRegexError::InvalidHyphenError(
+                            "Position of hyphen is invalid.".to_string(),
+                        ));
                     }
 
                     let char_before_hyphen = unsanitized_chars[char_index - 1];
                     let char_after_hyphen = unsanitized_chars[char_index + 1];
 
-                    add_chars_in_range(&mut char_present_table, char_before_hyphen, char_after_hyphen, order)?;
+                    add_chars_in_range(
+                        &mut char_present_table,
+                        char_before_hyphen,
+                        char_after_hyphen,
+                        order,
+                    )?;
                 } else if unsanitized_char == char_in_order {
                     char_present_table[order_index] = true;
                     break;
@@ -147,41 +165,56 @@ fn sanitize(unsanitized_chars: Vec<char>, order: &Vec<char>, inverse: bool) -> R
 }
 
 /// 한국어 음소(ㄱ,ㅏ,ㅢ, 등)를 모아 하나의 음절(가,각, 등)로 만듭니다.
-/// 
+///
 /// 이때 마지막 음소는 None이 될 수 있습니다.
-/// 
+///
 /// 만약 한글 음소가 아니거나 잘못된 위치라면 InvalidPhonemeError를 냅니다.
-/// 
+///
 /// orders는 한글 음소의 순서인데, Order::Default.compile()의 결과를 받습니다.
-fn convert_phonemes_to_syllable(first: char, middle: char, last: Option<char>, orders: &crate::CompiledOrders) -> Result<char, KoreanRegexError> {
+fn convert_phonemes_to_syllable(
+    first: char,
+    middle: char,
+    last: Option<char>,
+    orders: &crate::CompiledOrders,
+) -> Result<char, KoreanRegexError> {
     let (chosung, jungsung, jongsung_with_zero) = orders;
 
     let Some(chsung_position) = chosung.iter().position(|chr| chr == &first) else {
-        return Err(KoreanRegexError::InvalidPhonemeError(format!("{first} is not valid phoneme."), first))
+        return Err(KoreanRegexError::InvalidPhonemeError(
+            format!("{first} is not valid phoneme."),
+            first,
+        ));
     };
     let Some(jungsung_position) = jungsung.iter().position(|chr| chr == &middle) else {
-        return Err(KoreanRegexError::InvalidPhonemeError(format!("{middle} is not valid phoneme."), middle))
+        return Err(KoreanRegexError::InvalidPhonemeError(
+            format!("{middle} is not valid phoneme."),
+            middle,
+        ));
     };
     let jongsung_position = if let Some(last) = last {
         if let Some(jongsung_position) = jongsung_with_zero.iter().position(|chr| chr == &last) {
             jongsung_position
         } else {
-            return Err(KoreanRegexError::InvalidPhonemeError(format!("{last} is not valid phoneme."), last))
+            return Err(KoreanRegexError::InvalidPhonemeError(
+                format!("{last} is not valid phoneme."),
+                last,
+            ));
         }
     } else {
         0
     };
 
     char::from_u32(
-        (0xAC00 + 588 * chsung_position + 28 * jungsung_position + jongsung_position) as u32
-    ).ok_or(KoreanRegexError::CharConversionFailedError)
+        (0xAC00 + 588 * chsung_position + 28 * jungsung_position + jongsung_position) as u32,
+    )
+    .ok_or(KoreanRegexError::CharConversionFailedError)
 }
 
 /// 초성, 중성, 종성 자리에 들어갈 raw값을 받고 실제로 컴파일된 값을 내보냅니다.
-/// 
+///
 /// ```rust
 /// use korean_regex::*;
-/// 
+///
 /// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", &Order::Default).unwrap());
 /// ```
 pub fn substitute<'a>(
@@ -206,13 +239,19 @@ pub fn substitute<'a>(
     };
 
     let (chosung, jungsung, jongsung_with_zero) = order.compile();
-    let first = if first == "0" { None } else {
+    let first = if first == "0" {
+        None
+    } else {
         Some(convert_full(first, &chosung)??)
     };
-    let middle = if middle == "0" { None } else {
+    let middle = if middle == "0" {
+        None
+    } else {
         Some(convert_full(middle, &jungsung)??)
     };
-    let last = if last == "0" { None } else {
+    let last = if last == "0" {
+        None
+    } else {
         Some(convert_full(last, &jongsung_with_zero)??)
     };
 
@@ -251,33 +290,48 @@ pub fn substitute<'a>(
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_convert_parenthesized_string() {
-        assert_eq!(vec!['ㄼ', 'ㄱ', 'ㄷ', 'ㅊ', 'ㅁ', 'ㅌ', 'ㅈ', 'ㅁ', 'ㄷ', 'ㅘ', 'ㅢ', 'ㅓ', 'ㅑ', 'ㅢ', 'ㅓ', 'ㅕ', 'ㅢ'],
-                   convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)").unwrap());
-        assert_eq!(Vec::<char>::new(),
-                   convert_parenthesized_string("").unwrap());
+        assert_eq!(
+            vec![
+                'ㄼ', 'ㄱ', 'ㄷ', 'ㅊ', 'ㅁ', 'ㅌ', 'ㅈ', 'ㅁ', 'ㄷ', 'ㅘ', 'ㅢ', 'ㅓ', 'ㅑ', 'ㅢ',
+                'ㅓ', 'ㅕ', 'ㅢ'
+            ],
+            convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
+                .unwrap()
+        );
+        assert_eq!(
+            Vec::<char>::new(),
+            convert_parenthesized_string("").unwrap()
+        );
 
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)").unwrap_err() {
+        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
+            .unwrap_err()
+        {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
-            _ => panic!("Shoud raise UnparenthesizingFailedError")
+            _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡ)ㅣ)").unwrap_err() {
+        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡ)ㅣ)")
+            .unwrap_err()
+        {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
-            _ => panic!("Shoud raise UnparenthesizingFailedError")
+            _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑ)ㅢㅓㅕ(ㅡㅣ)").unwrap_err() {
+        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑ)ㅢㅓㅕ(ㅡㅣ)")
+            .unwrap_err()
+        {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
-            _ => panic!("Shoud raise UnparenthesizingFailedError")
+            _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ))").unwrap_err() {
+        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ))")
+            .unwrap_err()
+        {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
-            _ => panic!("Shoud raise UnparenthesizingFailedError")
+            _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
     }
 
@@ -312,7 +366,7 @@ mod test {
 
         match sanitize(vec!['ㅃ', 'ㄹ', '-', 'ㄴ', 'ㅎ'], &order, true).unwrap_err() {
             KoreanRegexError::InvalidHyphenError(_) => (),
-            _ => panic!("Shoud raise InvalidHyphenError")
+            _ => panic!("Shoud raise InvalidHyphenError"),
         };
 
         // 확인할 수 없는 문자열 있을 때 검사
@@ -322,9 +376,9 @@ mod test {
         );
         match sanitize(vec!['ㄴ', '-', 'h'], &order, false).unwrap_err() {
             KoreanRegexError::InvalidPhonemeError(..) => (),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        
+
         // 빈 문자열 검사
         assert_eq!(
             "".to_string(),
@@ -337,37 +391,54 @@ mod test {
 
         match sanitize(vec!['-', 'ㅃ', 'ㄴ', 'ㄹ', 'ㅎ'], &order, true).unwrap_err() {
             KoreanRegexError::InvalidHyphenError(_) => (),
-            _ => panic!("Shoud raise InvalidHyphenError")
+            _ => panic!("Shoud raise InvalidHyphenError"),
         };
         match sanitize(vec!['ㅃ', 'ㄴ', 'ㄹ', 'ㅎ', '-'], &order, true).unwrap_err() {
             KoreanRegexError::InvalidHyphenError(_) => (),
-            _ => panic!("Shoud raise InvalidHyphenError")
+            _ => panic!("Shoud raise InvalidHyphenError"),
         };
     }
 
     #[test]
     fn test_convert_phoneme_to_syllable() {
-        assert_eq!('둳', convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('ㄷ'), &Order::Default.compile()).unwrap());
-        assert_eq!('둬', convert_phonemes_to_syllable('ㄷ', 'ㅝ', None, &Order::Default.compile()).unwrap());
-        match convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('d'), &Order::Default.compile()).unwrap_err() {
+        assert_eq!(
+            '둳',
+            convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('ㄷ'), &Order::Default.compile())
+                .unwrap()
+        );
+        assert_eq!(
+            '둬',
+            convert_phonemes_to_syllable('ㄷ', 'ㅝ', None, &Order::Default.compile()).unwrap()
+        );
+        match convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('d'), &Order::Default.compile())
+            .unwrap_err()
+        {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('d', syllable),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㄷ', 'f', Some('ㅇ'), &Order::Default.compile()).unwrap_err() {
+        match convert_phonemes_to_syllable('ㄷ', 'f', Some('ㅇ'), &Order::Default.compile())
+            .unwrap_err()
+        {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('f', syllable),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㄷ', 'ㄷ', Some('ㅇ'), &Order::Default.compile()).unwrap_err() {
+        match convert_phonemes_to_syllable('ㄷ', 'ㄷ', Some('ㅇ'), &Order::Default.compile())
+            .unwrap_err()
+        {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('ㄷ', syllable),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㅏ', 'ㅏ', Some('ㅇ'), &Order::Default.compile()).unwrap_err() {
+        match convert_phonemes_to_syllable('ㅏ', 'ㅏ', Some('ㅇ'), &Order::Default.compile())
+            .unwrap_err()
+        {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('ㅏ', syllable),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('e', 'ㅏ', Some('ㅇ'), &Order::Default.compile()).unwrap_err() {
+        match convert_phonemes_to_syllable('e', 'ㅏ', Some('ㅇ'), &Order::Default.compile())
+            .unwrap_err()
+        {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('e', syllable),
-            _ => panic!("Shoud raise InvalidPhonemeError")
+            _ => panic!("Shoud raise InvalidPhonemeError"),
         };
     }
 
@@ -375,27 +446,48 @@ mod test {
     fn test_subtitude() {
         assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
                    substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &Order::Default).unwrap());
-        assert_eq!("가긔기다듸디아의이차츼치", substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &Order::Default).unwrap());
-        
-        assert_eq!("다닥닦닧단닩닪닫달닭닮닯닰닱닲닳담답닶닷닸당닺닻닼닽닾닿", substitute("ㄷ", "ㅏ", "", &Order::Default).unwrap());
-        assert_eq!("닿댛댷덓덯뎋뎧돃돟돻됗됳둏둫뒇뒣뒿듛듷딓딯", substitute("ㄷ", "", "ㅎ", &Order::Default).unwrap());
-        assert_eq!("갛깧낳닿땋랗맣밯빻샇쌓앟잫짷챃캏탛팧핳", substitute("", "ㅏ", "ㅎ", &Order::Default).unwrap());
-        
-        assert_eq!("ㄱㄷㅇㅊ", substitute("ㄱㄷㅊㅇ", "0", "0", &Order::Default).unwrap());
-        assert_eq!("ㅏㅗㅢ", substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &Order::Default).unwrap());
-        assert_eq!("ㄼㅅㅆㅇ", substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &Order::Default).unwrap());
+        assert_eq!(
+            "가긔기다듸디아의이차츼치",
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &Order::Default).unwrap()
+        );
+
+        assert_eq!(
+            "다닥닦닧단닩닪닫달닭닮닯닰닱닲닳담답닶닷닸당닺닻닼닽닾닿",
+            substitute("ㄷ", "ㅏ", "", &Order::Default).unwrap()
+        );
+        assert_eq!(
+            "닿댛댷덓덯뎋뎧돃돟돻됗됳둏둫뒇뒣뒿듛듷딓딯",
+            substitute("ㄷ", "", "ㅎ", &Order::Default).unwrap()
+        );
+        assert_eq!(
+            "갛깧낳닿땋랗맣밯빻샇쌓앟잫짷챃캏탛팧핳",
+            substitute("", "ㅏ", "ㅎ", &Order::Default).unwrap()
+        );
+
+        assert_eq!(
+            "ㄱㄷㅇㅊ",
+            substitute("ㄱㄷㅊㅇ", "0", "0", &Order::Default).unwrap()
+        );
+        assert_eq!(
+            "ㅏㅗㅢ",
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &Order::Default).unwrap()
+        );
+        assert_eq!(
+            "ㄼㅅㅆㅇ",
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &Order::Default).unwrap()
+        );
 
         match substitute("0", "0", "0", &Order::Default).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
-            _ => panic!("Shoud raise InvalidZeroPatternError")
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
         match substitute("0", "ㅏ", "ㅁ", &Order::Default).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
-            _ => panic!("Shoud raise InvalidZeroPatternError")
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
         match substitute("ㅎ", "0", "ㅁ", &Order::Default).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
-            _ => panic!("Shoud raise InvalidZeroPatternError")
+            _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
     }
 }
