@@ -91,7 +91,7 @@ fn sanitize(
     inverse: bool,
 ) -> Result<String, KoreanRegexError> {
     fn add_chars_in_range(
-        char_present_table: &mut Vec<bool>,
+        char_present_table: &mut [bool],
         char_before_hyphen: char,
         char_after_hyphen: char,
         order: &[char],
