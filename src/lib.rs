@@ -53,7 +53,7 @@ impl Order {
 
 pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexError> {
     let korean_regex_pattern_finder = match Regex::new(
-        r"\[([0ㄱ-ㅎㅏ-ㅣ\^()-]*):([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(:?)([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(?:\|([^]]*))?\]",
+        r"\[([0ㄱ-ㅎㅏ-ㅣ\^()-]*):([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(:?)([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(\|[^]]*)?\]",
     ) {
         Ok(result) => result,
         Err(regex_error) => return Err(KoreanRegexError::RegexError(regex_error)),
@@ -70,7 +70,10 @@ pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexEr
             } else {
                 &captured[4]
             };
-            let other_options = &captured[5];
+            let other_options = captured
+                .get(5)
+                .map(|other_options| &other_options.as_str()[1..])
+                .unwrap_or("");
             match substitute(chosung, jungsung, jongsung, orders) {
                 Ok(result) => format!("[{}{}]", result, other_options),
                 Err(error) => {
@@ -101,16 +104,18 @@ mod test {
 
     #[test]
     fn test_compilestr() {
-        let orders = Order::Default;
+        let order = Order::Default;
         assert_eq!(
             "123[강당항은]",
-            compilestr("123[ㄱㄷㅎ:ㅏ:ㅇ|은]", &orders).unwrap()
+            compilestr("123[ㄱㄷㅎ:ㅏ:ㅇ|은]", &order).unwrap()
         );
         assert_eq!(
             "123[ㄱㄷㅎ:d:ㅇ|은]",
-            compilestr("123[ㄱㄷㅎ:d:ㅇ|은]", &orders).unwrap()
+            compilestr("123[ㄱㄷㅎ:d:ㅇ|은]", &order).unwrap()
         );
-        match compilestr("123[ㄱㄷㅎ:(ㄱㄱㄱ):ㅇ|은]", &orders).unwrap_err() {
+        assert_eq!("[간긴난닌]", compilestr("[ㄱㄴ:ㅏㅣ:ㄴ]", &order).unwrap());
+        assert_eq!("[가기나니다디]", compile("[ㄱㄴㄷ:ㅏㅣ]", &order).unwrap().to_string());
+        match compilestr("123[ㄱㄷㅎ:(ㄱㄱㄱ):ㅇ|은]", &order).unwrap_err() {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
             _ => panic!("Should raise UnparenthesizingFailedError"),
         }
