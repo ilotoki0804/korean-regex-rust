@@ -206,10 +206,10 @@ fn convert_phonemes_to_syllable(
         0
     };
 
-    char::from_u32(
+    Ok(char::from_u32(
         (0xAC00 + 588 * chsung_position + 28 * jungsung_position + jongsung_position) as u32,
     )
-    .ok_or(KoreanRegexError::CharConversionFailedError)
+    .expect("This charactor conversion should succeed. Please create issue if this panic present."))
 }
 
 fn replace_with_hyphen(string: String) -> String {

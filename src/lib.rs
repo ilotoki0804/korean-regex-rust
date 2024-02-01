@@ -28,9 +28,10 @@
 //! assert_eq!("[간긴난닌]", compile("[ㄱㄴ:ㅏㅣ:ㄴ]", &order).unwrap().to_string());
 //! ```
 //!
-//! 만약 해당 칸은 비워놓는다면 해당 자리는 어떤 것이든 받아들이겠다는 의미입니다. 예를 들어 `[::ㅎ]`은 '종성이 `ㅎ`인 모든 음소'를 의미합니다.
+//! 만약 해당 칸은 비워놓는다면 해당 자리는 어떤 것이든 받아들이겠다는 의미입니다.
+//! 예를 들어 `[::ㅎ]`은 '종성이 `ㅎ`인 모든 음소'를 의미합니다.
 //!
-//! ```rust_do_not_run
+//! ```should_panic
 //! use korean_regex::*;
 //!
 //! let order = Order::Default;
@@ -70,7 +71,8 @@
 //! assert_eq!("[ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ]", compile("[0:ㅏ-ㅣ:0]", &order).unwrap().to_string());
 //! ```
 //!
-//! `^`을 이용하면 해당 음소에 match하고 싶은 문자 대신 match하기 싫은 문자를 지정할 수 있습니다. 예를 들어 초성이 `ㄱ`이고 중성이 `ㅏ`이면서 받침이 `ㄹ`이 아닌 모든 음소는 `[ㄱ:ㅏ:^ㄹ]`로 표현할 수 있습니다..
+//! `^`을 이용하면 해당 음소에 match하고 싶은 문자 대신 match하기 싫은 문자를 지정할 수 있습니다.
+//! 예를 들어 초성이 `ㄱ`이고 중성이 `ㅏ`이면서 받침이 `ㄹ`이 아닌 모든 음소는 `[ㄱ:ㅏ:^ㄹ]`로 표현할 수 있습니다.
 //!
 //! ```rust
 //! use korean_regex::*;
@@ -100,7 +102,7 @@
 //! ```
 //!
 //! 한글에는 두 개 이상의 글자가 합쳐서 생성된 문자들이 있습니다. `ㄲ`이나 `ㄼ`, `ㅢ` 등이 그 예입니다.
-//! 만약 글자 입력기가 `ㄺ`같은 문자를 작성하는 것을 지원하지 않거나, 미관상의 이유로 코드에서 피하고 싶다면
+//! 만약 글자 입력기가 `ㄺ`같은 문자를 입력하는 것을 지원하지 않거나, 미관상의 이유로 코드에서 피하고 싶다면
 //! 괄호를 사용해서 문자를 합칠 수 있습니다.
 //!
 //! ```rust
@@ -147,13 +149,26 @@ pub use substitute::substitute;
 
 type CompiledOrders<'a> = (Vec<char>, Vec<char>, Vec<char>);
 
+/// korean-regex에서 나올 수 있는 모든 오류입니다.
 #[derive(Debug)]
 pub enum KoreanRegexError {
+    /// 괄호로 묶인 문자를 합치는 것에 실패했을 때 나타나는 오류입니다.
+    /// 예를 들어 `(ㄱㅇ)`는 적절하지 않은 괄호 문법이기에 오류를 냅니다.
     UnparenthesizingFailedError(String),
+    /// 하이픈이 맨 앞이나 맨 뒤에 나오거나 문자 인덱스가 잘못되었을 경우 발생합니다.
+    /// 예를 들어 `[-ㅅ::]`는 하이픈의 앞에 해당하는 문자가 없기에 오류를 냅니다.
+    /// 또한 `[ㅅ-ㄱ::]`은 하이픈의 앞의 문자가 뒤의 문자보다 인덱스가 더 크기에 오류가 납니다.
     InvalidHyphenError(String),
+    /// 0은 종성이 위치에서는 올 수 있지만 초성이나 중성에서는 제한적이게만 가능합니다.
+    /// 예를 들어 `[0ㄱ:ㅏ0:ㄱ]`같이 초성이나 중성에는 0을 섞어서 쓸 수 없으며 오직
+    /// 0이거나 0이 아닌 문자들이거나 둘 중 하나만 가능합니다.
+    /// 또한 중성이 없는 한글은 없기에 `[ㄱ:0:ㄱ]`같은 패턴 또한 불가능하며
+    /// 초성이나 중성에 문자가 들어갈 수 있는 패턴은 오직 `[*:0:0]`이나 `[0:*:0]`뿐입니다.
+    /// 이 규칙을 어겼을 경우 이 오류가 납니다.
     InvalidZeroPatternError(String),
+    /// 한글 음소가 아닌 글자가 왔을 경우 발생합니다. 예를 들어 `[d:ㅏ:ㄴ]`은 오류를 발생시킵니다.
     InvalidPhonemeError(String, char),
-    CharConversionFailedError,
+    /// compile 함수에서 regex 관련 오류가 일어났을 경우 사용됩니다.
     RegexError(regex::Error),
 }
 
@@ -243,7 +258,7 @@ impl Order {
 /// use korean_regex::*;
 ///
 /// let pattern = compilestr(r"(?<![ㅎ:ㅏ:])[^ㄱ::][::ㅇ]", &Order::Default);
-/// let re = Regex::new(pattern).unwrap();
+/// let re = Regex::new(&pattern.unwrap()).unwrap();
 /// ```
 pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexError> {
     let korean_regex_pattern_finder = match Regex::new(
