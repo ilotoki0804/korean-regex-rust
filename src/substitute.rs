@@ -1,6 +1,6 @@
 use std::char;
 
-use crate::{KoreanRegexError, Order};
+use crate::{CompiledOrders, KoreanRegexError, Order};
 
 /// 이 크레이트에는 일부 조합형 글자를 괄호를 통해 표시하는 것이 가능합니다.
 ///
@@ -174,27 +174,28 @@ fn sanitize(
 ///
 /// orders는 한글 음소의 순서인데, Order::Default.compile()의 결과만 받습니다.
 fn convert_phonemes_to_syllable(
-    first: char,
-    middle: char,
-    last: Option<char>,
-    orders: &crate::CompiledOrders,
+    chosung: char,
+    jungsung: char,
+    jongsung: Option<char>,
+    orders: &CompiledOrders,
 ) -> Result<char, KoreanRegexError> {
-    let (chosung, jungsung, jongsung_with_zero) = orders;
+    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = orders;
 
-    let Some(chsung_position) = chosung.iter().position(|chr| chr == &first) else {
+    let Some(chsung_position) = all_chosungs.iter().position(|chr| chr == &chosung) else {
         return Err(KoreanRegexError::InvalidPhonemeError(
-            format!("{first} is not valid phoneme."),
-            first,
+            format!("{chosung} is not valid phoneme."),
+            chosung,
         ));
     };
-    let Some(jungsung_position) = jungsung.iter().position(|chr| chr == &middle) else {
+    let Some(jungsung_position) = all_jungsungs.iter().position(|chr| chr == &jungsung) else {
         return Err(KoreanRegexError::InvalidPhonemeError(
-            format!("{middle} is not valid phoneme."),
-            middle,
+            format!("{jungsung} is not valid phoneme."),
+            jungsung,
         ));
     };
-    let jongsung_position = if let Some(last) = last {
-        if let Some(jongsung_position) = jongsung_with_zero.iter().position(|chr| chr == &last) {
+    let jongsung_position = if let Some(last) = jongsung {
+        if let Some(jongsung_position) = all_jongsungs_with_zero.iter().position(|chr| chr == &last)
+        {
             jongsung_position
         } else {
             return Err(KoreanRegexError::InvalidPhonemeError(
@@ -248,63 +249,70 @@ fn replace_with_hyphen(string: String) -> String {
 ///
 /// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", &Order::Default, true).unwrap());
 /// ```
+///
+/// use_hyphen이 true라면 `ㄱㄴㄷㄹ`와 같은 연속된 문자열을 `ㄱ-ㄹ`과 같이 `-`을 이용한 식으로 변경하고,
+/// false라면 변경하지 않습니다.
 pub fn substitute<'a>(
-    first: &'a str,
-    middle: &'a str,
-    last: &'a str,
+    chosungs_raw: &'a str,
+    jungsungs_raw: &'a str,
+    jongsungs_raw: &'a str,
     order: &Order,
     use_hyphen: bool,
 ) -> Result<String, KoreanRegexError> {
-    let convert_full = |string, order| {
-        let mut char_vec = convert_parenthesized_string(string)?;
+    let sanitize_raw_chars = |string, order| {
+        let mut unparenthesized_chars = convert_parenthesized_string(string)?;
 
-        let inverse: bool = if char_vec.is_empty() {
+        let inverse: bool = if unparenthesized_chars.is_empty() {
             true
-        } else if char_vec[0] == '^' {
-            char_vec.remove(0);
+        } else if unparenthesized_chars[0] == '^' {
+            unparenthesized_chars.remove(0);
             true
         } else {
             false
         };
 
-        Ok(sanitize(char_vec, order, inverse))
+        Ok(sanitize(unparenthesized_chars, order, inverse))
     };
 
-    let (chosung, jungsung, jongsung_with_zero) = order.compile();
-    let first = if first == "0" {
+    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = order.compile();
+    let chosungs = if chosungs_raw == "0" {
         None
     } else {
-        Some(convert_full(first, &chosung)??)
+        Some(sanitize_raw_chars(chosungs_raw, &all_chosungs)??)
     };
-    let middle = if middle == "0" {
+    let jungsungs = if jungsungs_raw == "0" {
         None
     } else {
-        Some(convert_full(middle, &jungsung)??)
+        Some(sanitize_raw_chars(jungsungs_raw, &all_jungsungs)??)
     };
-    let last = if last == "0" {
+    let jongsungs = if jongsungs_raw == "0" {
         None
     } else {
-        Some(convert_full(last, &jongsung_with_zero)??)
+        Some(sanitize_raw_chars(
+            jongsungs_raw,
+            &all_jongsungs_with_zero,
+        )??)
     };
 
     let regular_compiled_order = Order::Default.compile();
 
-    match (first, middle, last) {
+    match (chosungs, jungsungs, jongsungs) {
         (None, None, None) =>
             Err(KoreanRegexError::InvalidZeroPatternError("[0:0:0] cannot be represented as Hangeul, thus invalid.".to_string())),
-        (None, Some(middle), Some(last)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(format!("[0:{middle}:{last}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid."))),
-        (Some(first), None, Some(last)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(format!("[{first}:0:{last}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid."))),
+        (None, Some(jungsungs), Some(jongsungs)) =>
+            Err(KoreanRegexError::InvalidZeroPatternError(format!("[0:{jungsungs}:{jongsungs}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid."))),
+        (Some(chosungs), None, Some(jongsungs)) =>
+            Err(KoreanRegexError::InvalidZeroPatternError(format!("[{chosungs}:0:{jongsungs}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid."))),
         (Some(chars), None, None)
         | (None, Some(chars), None)
         | (None, None, Some(chars)) => Ok(chars),
-        (Some(first), Some(middle), Some(last)) => {
+        (Some(chosungs), Some(jungsungs), Some(jongsungs)) => {
             let mut result = String::new();
-            for first_char in first.chars() {
-                for middle_char in middle.chars() {
-                    for last_char in last.chars() {
-                        result.push(convert_phonemes_to_syllable(first_char, middle_char, Some(last_char), &regular_compiled_order)?);
+            for chosung in chosungs.chars() {
+                for jungsung in jungsungs.chars() {
+                    for jongsung in jongsungs.chars() {
+                        result.push(convert_phonemes_to_syllable(
+                            chosung, jungsung, Some(jongsung), &regular_compiled_order)?);
                     }
                 }
             }
@@ -312,9 +320,10 @@ pub fn substitute<'a>(
         },
         (Some(first), Some(middle), None) => {
             let mut result = String::new();
-            for first_char in first.chars() {
-                for middle_char in middle.chars() {
-                    result.push(convert_phonemes_to_syllable(first_char, middle_char, None, &regular_compiled_order)?);
+            for chosung in first.chars() {
+                for jungsung in middle.chars() {
+                    result.push(convert_phonemes_to_syllable(
+                        chosung, jungsung, None, &regular_compiled_order)?);
                 }
             }
             Ok(if use_hyphen { replace_with_hyphen(result) } else { result })

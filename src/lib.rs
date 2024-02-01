@@ -149,7 +149,7 @@ pub use substitute::substitute;
 
 type CompiledOrders<'a> = (Vec<char>, Vec<char>, Vec<char>);
 
-/// korean-regex에서 나올 수 있는 모든 오류입니다.
+/// korean-regex에서 나올 수 있는 모든 오류를 모아놓은 enum입니다.
 #[derive(Debug)]
 pub enum KoreanRegexError {
     /// 괄호로 묶인 문자를 합치는 것에 실패했을 때 나타나는 오류입니다.
@@ -166,14 +166,14 @@ pub enum KoreanRegexError {
     /// 초성이나 중성에 문자가 들어갈 수 있는 패턴은 오직 `[*:0:0]`이나 `[0:*:0]`뿐입니다.
     /// 이 규칙을 어겼을 경우 이 오류가 납니다.
     InvalidZeroPatternError(String),
-    /// 한글 음소가 아닌 글자가 왔을 경우 발생합니다. 예를 들어 `[d:ㅏ:ㄴ]`은 오류를 발생시킵니다.
+    /// 한글 음소가 아닌 글자가 왔을 경우 발생합니다. 예를 들어 `[d:ㅏ:ㄴ]`은 이 오류를 발생시킵니다.
     InvalidPhonemeError(String, char),
     /// compile 함수에서 regex 관련 오류가 일어났을 경우 사용됩니다.
     RegexError(regex::Error),
 }
 
 /// 하이픈 구성 시 사용할 순서를 결정합니다.
-/// 
+///
 /// 이 라이브러리와 유니코드는 기본적으로 다음과 같은 순서를 사용합니다.
 ///
 /// ```raw
@@ -205,7 +205,7 @@ pub enum KoreanRegexError {
 /// 하이픈 사용 시 두 순서 중에서 어느 것이 자신의 필요에 맞는지 확인하고 사용하시면 됩니다.
 pub enum Order {
     /// 기본 순서입니다.
-    /// 
+    ///
     /// ```raw
     /// 초성: ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ
     /// 중성: ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ
@@ -213,7 +213,7 @@ pub enum Order {
     /// ```
     Default,
     /// 정규 음운 선행 순서입니다.
-    /// 
+    ///
     /// ```raw
     /// 초성: ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅃㅆㅉ
     /// 중성: ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣㅐㅒㅔㅖㅘㅙㅚㅝㅞㅟㅢ
@@ -228,35 +228,35 @@ impl Order {
     fn compile(&self) -> CompiledOrders {
         match self {
             Order::Default => {
-                let chosungs: Vec<char> =
+                let all_chosungs: Vec<char> =
                     "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".chars().collect();
-                let jungsungs: Vec<char> = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+                let all_jungsungs: Vec<char> = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
                     .chars()
                     .collect();
-                let jongsungs_with_zero: Vec<char> =
+                let all_jongsungs_with_zero: Vec<char> =
                     "0ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
                         .chars()
                         .collect();
-                (chosungs, jungsungs, jongsungs_with_zero)
+                (all_chosungs, all_jungsungs, all_jongsungs_with_zero)
             }
             Order::RegularFirst => {
-                let chosungs: Vec<char> =
+                let all_chosungs: Vec<char> =
                     "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅃㅆㅉ".chars().collect();
-                let jungsungs: Vec<char> = "ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣㅐㅒㅔㅖㅘㅙㅚㅝㅞㅟㅢ"
+                let all_jungsungs: Vec<char> = "ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣㅐㅒㅔㅖㅘㅙㅚㅝㅞㅟㅢ"
                     .chars()
                     .collect();
-                let jongsungs_with_zero: Vec<char> =
+                let all_jongsungs_with_zero: Vec<char> =
                     "0ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄳㄵㄶㄺㄻㄼㄽㄾㄿㅀㅄㅆ"
                         .chars()
                         .collect();
-                (chosungs, jungsungs, jongsungs_with_zero)
+                (all_chosungs, all_jungsungs, all_jongsungs_with_zero)
             }
         }
     }
 }
 
 /// 컴파일 결과를 Regex로 컴파일하는 대신 String 값으로 받습니다.
-/// 
+///
 /// `compile`은 단순히 `compilestr`의 결과를 `Regex::new`로 감싸는 함수일 뿐입니다.
 ///
 /// ```rust
@@ -284,25 +284,26 @@ impl Order {
 pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexError> {
     let korean_regex_pattern_finder = Regex::new(
         r"\[([0ㄱ-ㅎㅏ-ㅣ\^()-]*):([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(:?)([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(\|[^]]*)?\]",
-    ).map_err(KoreanRegexError::RegexError)?;
+    )
+    .map_err(KoreanRegexError::RegexError)?;
 
     let mut final_error: Option<KoreanRegexError> = None;
     let result = korean_regex_pattern_finder
         .replace_all(pattern, |captured: &regex::Captures<'_>| {
-            let chosung = &captured[1];
-            let jungsung = &captured[2];
+            let chosungs = &captured[1];
+            let jungsungs = &captured[2];
             let optional_delimiter = &captured[3];
-            let jongsung = if optional_delimiter.is_empty() {
+            let jongsungs = if optional_delimiter.is_empty() {
                 "0"
             } else {
                 &captured[4]
             };
-            let other_options = captured
+            let other_one_letter_options = captured
                 .get(5)
                 .map(|other_options| &other_options.as_str()[1..])
                 .unwrap_or("");
-            match substitute(chosung, jungsung, jongsung, orders, true) {
-                Ok(result) => format!("[{}{}]", result, other_options),
+            match substitute(chosungs, jungsungs, jongsungs, orders, true) {
+                Ok(result) => format!("[{}{}]", result, other_one_letter_options),
                 Err(error) => {
                     final_error = Some(error);
                     "(error)".to_string()
