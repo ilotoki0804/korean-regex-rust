@@ -2,6 +2,10 @@
 name = "korean_regex"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Regex extension for Hangeul analysis."
+authors = ["ilotoki0804 <ilotoki0804@gmail.com>"]
+keywords = ["korean", "regex"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
