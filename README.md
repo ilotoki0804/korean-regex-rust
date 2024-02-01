@@ -47,8 +47,8 @@ use korean_regex::*;
 
 let order = Order::Default;
 assert_eq!("[간깐난단딴란]", compile("[ㄱ-ㄹ:ㅏ:ㄴ]", &order).unwrap().to_string());
-assert_eq!("[간갠갼걘건겐견곈곤관괜괸굔군권궨귄균근긘긴]", compile("[ㄱ:[ㄱ:ㅏ-ㅣ:ㄴ]:ㄴ]", &order).unwrap().to_string());
-assert_eq!("[간갅갆갇갈]", compile("[ㄱ:ㅏ:ㄴ-ㄹ]", &order).unwrap().to_string());
+assert_eq!("[간갠갼걘건겐견곈곤관괜괸굔군권궨귄균근긘긴]", compile("[ㄱ:ㅏ-ㅣ:ㄴ]", &order).unwrap().to_string());
+assert_eq!("[간-갈]", compile("[ㄱ:ㅏ:ㄴ-ㄹ]", &order).unwrap().to_string());
 ```
 
 `0`은 해당 자리에 음소가 없다는 것을 의미합니다. 기본적으로 종성에 사용됩니다.
@@ -60,7 +60,7 @@ let order = Order::Default;
 assert_eq!("[가각간나낙난다닥단]", compile("[ㄱㄴㄷ:ㅏ:0ㄱㄴ]", &order).unwrap().to_string());
 ```
 
-하지만 특수하게 `[ㄱ:0:0]`이나 `[0:ㅏ:0]`과 같은 형태도 사용될 수 있습니다.
+하지만 특수하게 `[*:0:0]`이나 `[0:*:0]`과 같은 형태도 사용될 수 있습니다.
 
 ```rust
 use korean_regex::*;
@@ -76,7 +76,7 @@ assert_eq!("[ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ]", 
 use korean_regex::*;
 
 let order = Order::Default;
-assert_eq!("[가각갂갃간갅갆갇갉갊갋갌갍갎갏감갑값갓갔강갖갗갘같갚갛]", compile("[ㄱ:ㅏ:^ㄹ]", &order).unwrap().to_string());
+assert_eq!("[가-갇갉-갛]", compile("[ㄱ:ㅏ:^ㄹ]", &order).unwrap().to_string());
 ```
 
 만약 종성이 없는 문자를 match하고 싶다면 `[*:*:0]` 대신 `[*:*]` 문법을 사용할 수도 있습니다.
@@ -126,7 +126,7 @@ let result: Vec<_> = pattern
 assert_eq!(vec!["초성", "중성", "종성의", "사용하"], result)
 ```
 
-## Order
+## `Order`
 
 이 라이브러리와 유니코드는 기본적으로 다음과 같은 순서를 사용합니다.
 
@@ -156,7 +156,20 @@ assert_eq!(vec!["초성", "중성", "종성의", "사용하"], result)
 
 하이픈 사용 시 두 순서 중에서 어느 것이 자신의 필요에 맞는지 확인하고 사용하시면 됩니다.
 
-## compilestr
+## Hyphen replacing
+
+정규표현식의 `[]` 문법에는 연속되는 문자를 대체하는 `-` 문법이 있습니다.
+
+만약 연속되는 문자가 세 개 이상 있다면 korean-regex에서도 `-`문법이 이용됩니다.
+
+```rust
+use korean_regex::*;
+
+let order = Order::Default;
+assert_eq!("[가-깋라-맇]", compile("[ㄱㄹ::]", &order).unwrap().to_string());
+```
+
+## `compilestr`
 
 `compile`은 단순히 `compilestr`의 결과를 `Regex::new`로 감싸는 함수일 뿐입니다.
 
