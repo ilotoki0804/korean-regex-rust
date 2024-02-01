@@ -172,7 +172,7 @@ fn sanitize(
 ///
 /// 만약 한글 음소가 아니거나 잘못된 위치라면 InvalidPhonemeError를 냅니다.
 ///
-/// orders는 한글 음소의 순서인데, Order::Default.compile()의 결과를 받습니다.
+/// orders는 한글 음소의 순서인데, Order::Default.compile()의 결과만 받습니다.
 fn convert_phonemes_to_syllable(
     first: char,
     middle: char,
@@ -227,7 +227,8 @@ fn replace_with_hyphen(string: String) -> String {
     let mut hyphen_replaced_chars: Vec<char> = Vec::new();
     let mut continuous_chars: Vec<char> = Vec::new();
     for chr in string.chars() {
-        if continuous_chars.is_empty() || *continuous_chars.last().unwrap() as u32 + 1 == chr as u32 {
+        if continuous_chars.is_empty() || *continuous_chars.last().unwrap() as u32 + 1 == chr as u32
+        {
             continuous_chars.push(chr);
             continue;
         }
@@ -285,7 +286,7 @@ pub fn substitute<'a>(
         Some(convert_full(last, &jongsung_with_zero)??)
     };
 
-    let orders = Order::Default.compile();
+    let regular_compiled_order = Order::Default.compile();
 
     match (first, middle, last) {
         (None, None, None) =>
@@ -302,7 +303,7 @@ pub fn substitute<'a>(
             for first_char in first.chars() {
                 for middle_char in middle.chars() {
                     for last_char in last.chars() {
-                        result.push(convert_phonemes_to_syllable(first_char, middle_char, Some(last_char), &orders)?);
+                        result.push(convert_phonemes_to_syllable(first_char, middle_char, Some(last_char), &regular_compiled_order)?);
                     }
                 }
             }
@@ -312,7 +313,7 @@ pub fn substitute<'a>(
             let mut result = String::new();
             for first_char in first.chars() {
                 for middle_char in middle.chars() {
-                    result.push(convert_phonemes_to_syllable(first_char, middle_char, None, &orders)?);
+                    result.push(convert_phonemes_to_syllable(first_char, middle_char, None, &regular_compiled_order)?);
                 }
             }
             Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
