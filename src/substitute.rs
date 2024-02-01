@@ -244,7 +244,7 @@ fn replace_with_hyphen(string: String) -> String {
 /// ```rust
 /// use korean_regex::*;
 ///
-/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", &Order::Default).unwrap());
+/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", &Order::Default, true).unwrap());
 /// ```
 pub fn substitute<'a>(
     first: &'a str,
