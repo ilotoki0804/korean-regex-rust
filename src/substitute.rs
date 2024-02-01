@@ -212,6 +212,7 @@ fn convert_phonemes_to_syllable(
     .expect("This charactor conversion should succeed. Please create issue if this panic present."))
 }
 
+/// `ㄱㄴㄷㄹ`와 같이 연속된 문자들을 `ㄱ-ㄹ`와 같이 `-`를 이용해 압축합니다.
 fn replace_with_hyphen(string: String) -> String {
     fn collect_hyphen(hyphen_replaced_chars: &mut Vec<char>, continuous_chars: &mut Vec<char>) {
         if continuous_chars.len() <= 2 {
