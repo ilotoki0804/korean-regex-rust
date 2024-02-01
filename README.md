@@ -159,7 +159,20 @@ assert_eq!(vec!["초성", "중성", "종성의", "사용하"], result)
 ## compilestr
 
 `compile`은 단순히 `compilestr`의 결과를 `Regex::new`로 감싸는 함수일 뿐입니다.
-또한 Rust에서는 정규표현식 크레이트가 하나가 아닙니다. 만약 다른 정규표현식 크레이트를 이용하고 싶은 경우에 사용할 수 있습니다.
+
+```rust
+use korean_regex::*;
+use regex::Regex;
+
+let order = Order::Default;
+assert_eq!(
+    compilestr("[ㄱ::]", &order).unwrap(),
+    compile("[ㄱ::]", &order).unwrap().to_string()
+);
+```
+
+Rust에서는 정규표현식 크레이트가 하나가 아닙니다.
+만약 다른 정규표현식 크레이트를 이용하고 싶은 경우에 compilestr을 이용해 다른 정규표현식 크레이트를 사용할 수 있습니다.
 
 ```rust
 use fancy_regex::Regex;
