@@ -282,12 +282,9 @@ impl Order {
 /// let re = Regex::new(&pattern.unwrap()).unwrap();
 /// ```
 pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexError> {
-    let korean_regex_pattern_finder = match Regex::new(
+    let korean_regex_pattern_finder = Regex::new(
         r"\[([0ㄱ-ㅎㅏ-ㅣ\^()-]*):([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(:?)([0ㄱ-ㅎㅏ-ㅣ\^()-]*)(\|[^]]*)?\]",
-    ) {
-        Ok(result) => result,
-        Err(regex_error) => return Err(KoreanRegexError::RegexError(regex_error)),
-    };
+    ).map_err(KoreanRegexError::RegexError)?;
 
     let mut final_error: Option<KoreanRegexError> = None;
     let result = korean_regex_pattern_finder
@@ -323,10 +320,7 @@ pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexEr
 
 /// 한국어 regex가 담긴 패턴을 받아 Regex로 컴파일합니다.
 pub fn compile(pattern: &str, orders: &Order) -> Result<regex::Regex, KoreanRegexError> {
-    match Regex::new(compilestr(pattern, orders)?.as_str()) {
-        Ok(result) => Ok(result),
-        Err(regex_error) => Err(KoreanRegexError::RegexError(regex_error)),
-    }
+    Regex::new(compilestr(pattern, orders)?.as_str()).map_err(KoreanRegexError::RegexError)
 }
 
 #[cfg(test)]
