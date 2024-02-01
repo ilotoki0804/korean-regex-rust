@@ -74,7 +74,7 @@ pub fn compilestr(pattern: &str, orders: &Order) -> Result<String, KoreanRegexEr
                 .get(5)
                 .map(|other_options| &other_options.as_str()[1..])
                 .unwrap_or("");
-            match substitute(chosung, jungsung, jongsung, orders) {
+            match substitute(chosung, jungsung, jongsung, orders, true) {
                 Ok(result) => format!("[{}{}]", result, other_options),
                 Err(error) => {
                     final_error = Some(error);

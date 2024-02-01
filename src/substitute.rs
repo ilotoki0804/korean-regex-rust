@@ -1,3 +1,5 @@
+use std::char;
+
 use crate::{KoreanRegexError, Order};
 
 /// 이 크레이트에는 일부 조합형 글자를 괄호를 통해 표시하는 것이 가능합니다.
@@ -210,6 +212,33 @@ fn convert_phonemes_to_syllable(
     .ok_or(KoreanRegexError::CharConversionFailedError)
 }
 
+fn replace_with_hyphen(string: String) -> String {
+    fn collect_hyphen(hyphen_replaced_chars: &mut Vec<char>, continuous_chars: &mut Vec<char>) {
+        if continuous_chars.len() <= 2 {
+            hyphen_replaced_chars.append(continuous_chars);
+        } else {
+            hyphen_replaced_chars.push(continuous_chars[0]);
+            hyphen_replaced_chars.push('-');
+            hyphen_replaced_chars.push(continuous_chars[continuous_chars.len() - 1]);
+            continuous_chars.clear();
+        }
+    }
+
+    let mut hyphen_replaced_chars: Vec<char> = Vec::new();
+    let mut continuous_chars: Vec<char> = Vec::new();
+    for chr in string.chars() {
+        if continuous_chars.is_empty() || *continuous_chars.last().unwrap() as u32 + 1 == chr as u32 {
+            continuous_chars.push(chr);
+            continue;
+        }
+        collect_hyphen(&mut hyphen_replaced_chars, &mut continuous_chars);
+        continuous_chars.push(chr);
+    }
+    collect_hyphen(&mut hyphen_replaced_chars, &mut continuous_chars);
+
+    hyphen_replaced_chars.iter().collect()
+}
+
 /// 초성, 중성, 종성 자리에 들어갈 raw값을 받고 실제로 컴파일된 값을 내보냅니다.
 ///
 /// ```rust
@@ -222,6 +251,7 @@ pub fn substitute<'a>(
     middle: &'a str,
     last: &'a str,
     order: &Order,
+    use_hyphen: bool,
 ) -> Result<String, KoreanRegexError> {
     let convert_full = |string, order| {
         let mut char_vec = convert_parenthesized_string(string)?;
@@ -276,7 +306,7 @@ pub fn substitute<'a>(
                     }
                 }
             }
-            Ok(result)
+            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
         },
         (Some(first), Some(middle), None) => {
             let mut result = String::new();
@@ -285,7 +315,7 @@ pub fn substitute<'a>(
                     result.push(convert_phonemes_to_syllable(first_char, middle_char, None, &orders)?);
                 }
             }
-            Ok(result)
+            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
         },
     }
 }
@@ -447,47 +477,59 @@ mod test {
         let order = Order::Default;
 
         assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
         assert_eq!(
             "가긔기다듸디아의이차츼치",
-            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order).unwrap()
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order, false).unwrap()
         );
 
         assert_eq!(
             "다닥닦닧단닩닪닫달닭닮닯닰닱닲닳담답닶닷닸당닺닻닼닽닾닿",
-            substitute("ㄷ", "ㅏ", "", &order).unwrap()
+            substitute("ㄷ", "ㅏ", "", &order, false).unwrap()
         );
         assert_eq!(
             "닿댛댷덓덯뎋뎧돃돟돻됗됳둏둫뒇뒣뒿듛듷딓딯",
-            substitute("ㄷ", "", "ㅎ", &order).unwrap()
+            substitute("ㄷ", "", "ㅎ", &order, false).unwrap()
         );
         assert_eq!(
             "갛깧낳닿땋랗맣밯빻샇쌓앟잫짷챃캏탛팧핳",
-            substitute("", "ㅏ", "ㅎ", &order).unwrap()
+            substitute("", "ㅏ", "ㅎ", &order, false).unwrap()
         );
 
         assert_eq!(
             "ㄱㄷㅇㅊ",
-            substitute("ㄱㄷㅊㅇ", "0", "0", &order).unwrap()
+            substitute("ㄱㄷㅊㅇ", "0", "0", &order, false).unwrap()
         );
         assert_eq!(
             "ㅏㅗㅢ",
-            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order).unwrap()
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order, false).unwrap()
         );
         assert_eq!(
             "ㄼㅅㅆㅇ",
-            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order).unwrap()
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order, false).unwrap()
         );
 
-        match substitute("0", "0", "0", &order).unwrap_err() {
+        // hyphen 대체 테스트
+        assert_eq!(
+            "가-깋라-맇바-빟",
+            substitute("ㄱㄹㅂ", "", "", &order, true).unwrap()
+        );
+        assert_eq!(
+            "강당항",
+            substitute("ㄱㄷㅎ", "ㅏ", "ㅇ", &order, true).unwrap()
+        );
+        assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
+
+        match substitute("0", "0", "0", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("0", "ㅏ", "ㅁ", &order).unwrap_err() {
+        match substitute("0", "ㅏ", "ㅁ", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("ㅎ", "0", "ㅁ", &order).unwrap_err() {
+        match substitute("ㅎ", "0", "ㅁ", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
@@ -498,49 +540,59 @@ mod test {
         let order = Order::RegularFirst;
 
         assert_eq!("가각갖갋기긱깆긻긔긕긪긟다닥닺닯디딕딪딟듸듹딎딃아악앚앏이익잊읿의읙읮읣차착찾찳치칙칮칣츼츽칒칇",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
         assert_eq!(
             "가기긔다디듸아이의차치츼",
-            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order).unwrap()
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order, false).unwrap()
         );
 
         assert_eq!(
             "다닥단닫달담답닷당닺닻닼닽닾닿닦닧닩닪닭닮닯닰닱닲닳닶닸",
-            substitute("ㄷ", "ㅏ", "", &order).unwrap()
+            substitute("ㄷ", "ㅏ", "", &order, false).unwrap()
         );
         assert_eq!(
             "닿댷덯뎧돟둏둫듛듷딯댛덓뎋돃돻됗됳뒇뒣뒿딓",
-            substitute("ㄷ", "", "ㅎ", &order).unwrap()
+            substitute("ㄷ", "", "ㅎ", &order, false).unwrap()
         );
         assert_eq!(
             "갛낳닿랗맣밯샇앟잫챃캏탛팧핳깧땋빻쌓짷",
-            substitute("", "ㅏ", "ㅎ", &order).unwrap()
+            substitute("", "ㅏ", "ㅎ", &order, false).unwrap()
         );
 
         assert_eq!(
             "ㄱㄷㅇㅊ",
-            substitute("ㄱㄷㅊㅇ", "0", "0", &order).unwrap()
+            substitute("ㄱㄷㅊㅇ", "0", "0", &order, false).unwrap()
         );
         assert_eq!(
             "ㅏㅗㅢ",
-            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order).unwrap()
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order, false).unwrap()
         );
         assert_eq!(
             "ㅅㅇㄼㅆ",
-            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order).unwrap()
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order, false).unwrap()
         );
 
-        match substitute("0", "0", "0", &order).unwrap_err() {
+        assert_eq!(
+            "가각간갇갈감갑갓강-갛갂갃갅갆갉-갏값갔",
+            &substitute("ㄱ", "ㅏ", "", &order, true).unwrap()
+        );
+
+        match substitute("0", "0", "0", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("0", "ㅏ", "ㅁ", &order).unwrap_err() {
+        match substitute("0", "ㅏ", "ㅁ", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("ㅎ", "0", "ㅁ", &order).unwrap_err() {
+        match substitute("ㅎ", "0", "ㅁ", &order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
+    }
+
+    #[test]
+    fn test_replace_with_hyphen() {
+        dbg!(replace_with_hyphen("강당항".to_string()));
     }
 }
