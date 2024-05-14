@@ -2,6 +2,106 @@ use std::char;
 
 use crate::{CompiledOrders, KoreanRegexError, Order};
 
+/// 초성, 중성, 종성 자리에 들어갈 raw값을 받고 실제로 컴파일된 값을 내보냅니다.
+///
+/// ```rust
+/// use korean_regex::*;
+///
+/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", Order::Default, true).unwrap());
+/// ```
+///
+/// use_hyphen이 true라면 `ㄱㄴㄷㄹ`와 같은 연속된 문자열을 `ㄱ-ㄹ`과 같이 `-`을 이용한 식으로 변경하고,
+/// false라면 변경하지 않습니다.
+pub fn substitute<'a>(
+    chosungs_raw: &'a str,
+    jungsungs_raw: &'a str,
+    jongsungs_raw: &'a str,
+    order: Order,
+    use_hyphen: bool,
+) -> Result<String, KoreanRegexError> {
+    let sanitize_raw_chars = |string, order| {
+        let mut unparenthesized_chars = unparenthesize(string)?;
+
+        let inverse: bool = if unparenthesized_chars.is_empty() {
+            true
+        } else if unparenthesized_chars[0] == '^' {
+            unparenthesized_chars.remove(0);
+            true
+        } else {
+            false
+        };
+
+        Ok(sanitize(unparenthesized_chars, order, inverse))
+    };
+
+    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = order.order();
+    let chosungs = if chosungs_raw == "0" {
+        None
+    } else {
+        Some(sanitize_raw_chars(chosungs_raw, all_chosungs)??)
+    };
+    let jungsungs = if jungsungs_raw == "0" {
+        None
+    } else {
+        Some(sanitize_raw_chars(jungsungs_raw, all_jungsungs)??)
+    };
+    let jongsungs = if jongsungs_raw == "0" {
+        None
+    } else {
+        Some(sanitize_raw_chars(
+            jongsungs_raw,
+            all_jongsungs_with_zero,
+        )??)
+    };
+
+    let regular_compiled_order = Order::Default.order();
+
+    match (chosungs, jungsungs, jongsungs) {
+        (None, None, None) =>
+            Err(KoreanRegexError::InvalidZeroPatternError("[0:0:0] cannot be represented as Hangeul, thus invalid.".to_string())),
+        (None, Some(jungsungs), Some(jongsungs)) =>
+            Err(KoreanRegexError::InvalidZeroPatternError(
+                format!("[0:{}:{}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid.",
+                    jungsungs.into_iter().collect::<String>(),
+                    jongsungs.into_iter().collect::<String>(),
+                ),
+            )),
+        (Some(chosungs), None, Some(jongsungs)) =>
+            Err(KoreanRegexError::InvalidZeroPatternError(
+                    format!(
+                        "[{}:0:{}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid.",
+                        chosungs.into_iter().collect::<String>(),
+                        jongsungs.into_iter().collect::<String>(),
+                    ),
+                )),
+        (Some(chars), None, None)
+        | (None, Some(chars), None)
+        | (None, None, Some(chars)) => Ok(chars.into_iter().collect()),
+        (Some(chosungs), Some(jungsungs), Some(jongsungs)) => {
+            let mut result = String::new();
+            for chosung in chosungs.iter() {
+                for jungsung in jungsungs.iter() {
+                    for jongsung in jongsungs.iter() {
+                        result.push(convert_phonemes_to_syllable(
+                            *chosung, *jungsung, Some(*jongsung), regular_compiled_order)?);
+                    }
+                }
+            }
+            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
+        },
+        (Some(first), Some(middle), None) => {
+            let mut result = String::new();
+            for chosung in first.iter() {
+                for jungsung in middle.iter() {
+                    result.push(convert_phonemes_to_syllable(
+                        *chosung, *jungsung, None, regular_compiled_order)?);
+                }
+            }
+            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
+        },
+    }
+}
+
 /// 이 크레이트에는 일부 조합형 글자를 괄호를 통해 표시하는 것이 가능합니다.
 ///
 /// 예를 들어 `ㅢ`의 경우 `(ㅡㅣ)`로 표시할 수 있고, `ㄼ`의 경우 `ㄹㅂ`으로 표시할 수 있습니다.
@@ -238,106 +338,6 @@ fn replace_with_hyphen(string: String) -> String {
     collect_hyphen(&mut hyphen_replaced_chars, &mut continuous_chars);
 
     hyphen_replaced_chars.iter().collect()
-}
-
-/// 초성, 중성, 종성 자리에 들어갈 raw값을 받고 실제로 컴파일된 값을 내보냅니다.
-///
-/// ```rust
-/// use korean_regex::*;
-///
-/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", Order::Default, true).unwrap());
-/// ```
-///
-/// use_hyphen이 true라면 `ㄱㄴㄷㄹ`와 같은 연속된 문자열을 `ㄱ-ㄹ`과 같이 `-`을 이용한 식으로 변경하고,
-/// false라면 변경하지 않습니다.
-pub fn substitute<'a>(
-    chosungs_raw: &'a str,
-    jungsungs_raw: &'a str,
-    jongsungs_raw: &'a str,
-    order: Order,
-    use_hyphen: bool,
-) -> Result<String, KoreanRegexError> {
-    let sanitize_raw_chars = |string, order| {
-        let mut unparenthesized_chars = unparenthesize(string)?;
-
-        let inverse: bool = if unparenthesized_chars.is_empty() {
-            true
-        } else if unparenthesized_chars[0] == '^' {
-            unparenthesized_chars.remove(0);
-            true
-        } else {
-            false
-        };
-
-        Ok(sanitize(unparenthesized_chars, order, inverse))
-    };
-
-    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = order.order();
-    let chosungs = if chosungs_raw == "0" {
-        None
-    } else {
-        Some(sanitize_raw_chars(chosungs_raw, all_chosungs)??)
-    };
-    let jungsungs = if jungsungs_raw == "0" {
-        None
-    } else {
-        Some(sanitize_raw_chars(jungsungs_raw, all_jungsungs)??)
-    };
-    let jongsungs = if jongsungs_raw == "0" {
-        None
-    } else {
-        Some(sanitize_raw_chars(
-            jongsungs_raw,
-            all_jongsungs_with_zero,
-        )??)
-    };
-
-    let regular_compiled_order = Order::Default.order();
-
-    match (chosungs, jungsungs, jongsungs) {
-        (None, None, None) =>
-            Err(KoreanRegexError::InvalidZeroPatternError("[0:0:0] cannot be represented as Hangeul, thus invalid.".to_string())),
-        (None, Some(jungsungs), Some(jongsungs)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(
-                format!("[0:{}:{}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid.",
-                    jungsungs.into_iter().collect::<String>(),
-                    jongsungs.into_iter().collect::<String>(),
-                ),
-            )),
-        (Some(chosungs), None, Some(jongsungs)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(
-                    format!(
-                        "[{}:0:{}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid.",
-                        chosungs.into_iter().collect::<String>(),
-                        jongsungs.into_iter().collect::<String>(),
-                    ),
-                )),
-        (Some(chars), None, None)
-        | (None, Some(chars), None)
-        | (None, None, Some(chars)) => Ok(chars.into_iter().collect()),
-        (Some(chosungs), Some(jungsungs), Some(jongsungs)) => {
-            let mut result = String::new();
-            for chosung in chosungs.iter() {
-                for jungsung in jungsungs.iter() {
-                    for jongsung in jongsungs.iter() {
-                        result.push(convert_phonemes_to_syllable(
-                            *chosung, *jungsung, Some(*jongsung), regular_compiled_order)?);
-                    }
-                }
-            }
-            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
-        },
-        (Some(first), Some(middle), None) => {
-            let mut result = String::new();
-            for chosung in first.iter() {
-                for jungsung in middle.iter() {
-                    result.push(convert_phonemes_to_syllable(
-                        *chosung, *jungsung, None, regular_compiled_order)?);
-                }
-            }
-            Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
-        },
-    }
 }
 
 #[cfg(test)]
