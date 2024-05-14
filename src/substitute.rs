@@ -10,12 +10,12 @@ use crate::{CompiledOrders, KoreanRegexError, Order};
 /// ```rust
 /// use korean_regex::*;
 /// assert_eq!("[깕깗끩끫낅낇딹딻띍띏띩띫]",
-///            compilestr("[(ㄱㄱ)ㄸ:ㅏㅣ(ㅡㅣ):(ㄹㅂ)ㄺ]", &Order::Default).unwrap())
+///            compilestr("[(ㄱㄱ)ㄸ:ㅏㅣ(ㅡㅣ):(ㄹㅂ)ㄺ]", Order::Default).unwrap())
 /// ```
-fn convert_parenthesized_string(parenthesized_string: &str) -> Result<Vec<char>, KoreanRegexError> {
+fn unparenthesize(parenthesized_string: &str) -> Result<Vec<char>, KoreanRegexError> {
     let mut does_inside_parenthisis = false;
-    let mut chars_inside_parenthesis = String::from("");
-    let mut unparenthesized_chars = Vec::new();
+    let mut chars_inside_parenthesis = String::with_capacity(2);
+    let mut unparenthesized_chars = Vec::with_capacity(parenthesized_string.len());
     for char in parenthesized_string.chars() {
         match char {
             '(' => {
@@ -89,9 +89,9 @@ fn convert_parenthesized_string(parenthesized_string: &str) -> Result<Vec<char>,
 /// 1. 만약 inverse=True일 경우 결과값을 뒤집습니다.
 fn sanitize(
     unsanitized_chars: Vec<char>,
-    order: &Vec<char>,
+    order: &[char],
     inverse: bool,
-) -> Result<String, KoreanRegexError> {
+) -> Result<Vec<char>, KoreanRegexError> {
     fn add_chars_in_range(
         char_present_table: &mut [bool],
         char_before_hyphen: char,
@@ -157,7 +157,7 @@ fn sanitize(
         char_present_table = char_present_table.into_iter().map(|value| !value).collect();
     }
 
-    let mut result = String::with_capacity(order.len());
+    let mut result = Vec::with_capacity(order.len());
     for (chr, does_present) in order.iter().zip(char_present_table) {
         if does_present {
             result.push(*chr);
@@ -177,7 +177,7 @@ fn convert_phonemes_to_syllable(
     chosung: char,
     jungsung: char,
     jongsung: Option<char>,
-    orders: &CompiledOrders,
+    orders: CompiledOrders,
 ) -> Result<char, KoreanRegexError> {
     let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = orders;
 
@@ -194,15 +194,13 @@ fn convert_phonemes_to_syllable(
         ));
     };
     let jongsung_position = if let Some(last) = jongsung {
-        if let Some(jongsung_position) = all_jongsungs_with_zero.iter().position(|chr| chr == &last)
-        {
-            jongsung_position
-        } else {
+        let Some(jongsung_position) = all_jongsungs_with_zero.iter().position(|chr| chr == &last) else {
             return Err(KoreanRegexError::InvalidPhonemeError(
                 format!("{last} is not valid phoneme."),
                 last,
             ));
-        }
+        };
+        jongsung_position
     } else {
         0
     };
@@ -247,7 +245,7 @@ fn replace_with_hyphen(string: String) -> String {
 /// ```rust
 /// use korean_regex::*;
 ///
-/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", &Order::Default, true).unwrap());
+/// assert_eq!("간긴난닌단딘", substitute("ㄱㄴㄷ", "ㅏㅣ", "ㄴ", Order::Default, true).unwrap());
 /// ```
 ///
 /// use_hyphen이 true라면 `ㄱㄴㄷㄹ`와 같은 연속된 문자열을 `ㄱ-ㄹ`과 같이 `-`을 이용한 식으로 변경하고,
@@ -256,11 +254,11 @@ pub fn substitute<'a>(
     chosungs_raw: &'a str,
     jungsungs_raw: &'a str,
     jongsungs_raw: &'a str,
-    order: &Order,
+    order: Order,
     use_hyphen: bool,
 ) -> Result<String, KoreanRegexError> {
     let sanitize_raw_chars = |string, order| {
-        let mut unparenthesized_chars = convert_parenthesized_string(string)?;
+        let mut unparenthesized_chars = unparenthesize(string)?;
 
         let inverse: bool = if unparenthesized_chars.is_empty() {
             true
@@ -274,45 +272,56 @@ pub fn substitute<'a>(
         Ok(sanitize(unparenthesized_chars, order, inverse))
     };
 
-    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = order.compile();
+    let (all_chosungs, all_jungsungs, all_jongsungs_with_zero) = order.order();
     let chosungs = if chosungs_raw == "0" {
         None
     } else {
-        Some(sanitize_raw_chars(chosungs_raw, &all_chosungs)??)
+        Some(sanitize_raw_chars(chosungs_raw, all_chosungs)??)
     };
     let jungsungs = if jungsungs_raw == "0" {
         None
     } else {
-        Some(sanitize_raw_chars(jungsungs_raw, &all_jungsungs)??)
+        Some(sanitize_raw_chars(jungsungs_raw, all_jungsungs)??)
     };
     let jongsungs = if jongsungs_raw == "0" {
         None
     } else {
         Some(sanitize_raw_chars(
             jongsungs_raw,
-            &all_jongsungs_with_zero,
+            all_jongsungs_with_zero,
         )??)
     };
 
-    let regular_compiled_order = Order::Default.compile();
+    let regular_compiled_order = Order::Default.order();
 
     match (chosungs, jungsungs, jongsungs) {
         (None, None, None) =>
             Err(KoreanRegexError::InvalidZeroPatternError("[0:0:0] cannot be represented as Hangeul, thus invalid.".to_string())),
         (None, Some(jungsungs), Some(jongsungs)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(format!("[0:{jungsungs}:{jongsungs}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid."))),
+            Err(KoreanRegexError::InvalidZeroPatternError(
+                format!("[0:{}:{}]([0:*:*] pattern) cannot be represented as Hangeul, thus invalid.",
+                    jungsungs.into_iter().collect::<String>(),
+                    jongsungs.into_iter().collect::<String>(),
+                ),
+            )),
         (Some(chosungs), None, Some(jongsungs)) =>
-            Err(KoreanRegexError::InvalidZeroPatternError(format!("[{chosungs}:0:{jongsungs}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid."))),
+            Err(KoreanRegexError::InvalidZeroPatternError(
+                    format!(
+                        "[{}:0:{}]([*:0:*] pattern) cannot be represented as Hangeul, thus invalid.",
+                        chosungs.into_iter().collect::<String>(),
+                        jongsungs.into_iter().collect::<String>(),
+                    ),
+                )),
         (Some(chars), None, None)
         | (None, Some(chars), None)
-        | (None, None, Some(chars)) => Ok(chars),
+        | (None, None, Some(chars)) => Ok(chars.into_iter().collect()),
         (Some(chosungs), Some(jungsungs), Some(jongsungs)) => {
             let mut result = String::new();
-            for chosung in chosungs.chars() {
-                for jungsung in jungsungs.chars() {
-                    for jongsung in jongsungs.chars() {
+            for chosung in chosungs.iter() {
+                for jungsung in jungsungs.iter() {
+                    for jongsung in jongsungs.iter() {
                         result.push(convert_phonemes_to_syllable(
-                            chosung, jungsung, Some(jongsung), &regular_compiled_order)?);
+                            *chosung, *jungsung, Some(*jongsung), regular_compiled_order)?);
                     }
                 }
             }
@@ -320,10 +329,10 @@ pub fn substitute<'a>(
         },
         (Some(first), Some(middle), None) => {
             let mut result = String::new();
-            for chosung in first.chars() {
-                for jungsung in middle.chars() {
+            for chosung in first.iter() {
+                for jungsung in middle.iter() {
                     result.push(convert_phonemes_to_syllable(
-                        chosung, jungsung, None, &regular_compiled_order)?);
+                        *chosung, *jungsung, None, regular_compiled_order)?);
                 }
             }
             Ok(if use_hyphen { replace_with_hyphen(result) } else { result })
@@ -336,39 +345,39 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_convert_parenthesized_string() {
+    fn test_unparenthesize() {
         assert_eq!(
             vec![
                 'ㄼ', 'ㄱ', 'ㄷ', 'ㅊ', 'ㅁ', 'ㅌ', 'ㅈ', 'ㅁ', 'ㄷ', 'ㅘ', 'ㅢ', 'ㅓ', 'ㅑ', 'ㅢ',
                 'ㅓ', 'ㅕ', 'ㅢ'
             ],
-            convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
+            unparenthesize("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
                 .unwrap()
         );
         assert_eq!(
             Vec::<char>::new(),
-            convert_parenthesized_string("").unwrap()
+            unparenthesize("").unwrap()
         );
 
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
+        match unparenthesize("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ)")
             .unwrap_err()
         {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
             _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡ)ㅣ)")
+        match unparenthesize("(ㄹㅂ)ㄱㄷ(ㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡ)ㅣ)")
             .unwrap_err()
         {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
             _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑ)ㅢㅓㅕ(ㅡㅣ)")
+        match unparenthesize("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑ)ㅢㅓㅕ(ㅡㅣ)")
             .unwrap_err()
         {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
             _ => panic!("Shoud raise UnparenthesizingFailedError"),
         };
-        match convert_parenthesized_string("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ))")
+        match unparenthesize("(ㄹㅂ)ㄱㄷㅊㅁㅌㅈㅁㄷ(ㅗㅏ)(ㅡㅣ)ㅓㅑㅢㅓㅕ(ㅡㅣ))")
             .unwrap_err()
         {
             KoreanRegexError::UnparenthesizingFailedError(_) => (),
@@ -381,27 +390,27 @@ mod test {
         let order = Vec::from_iter("ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".chars());
 
         assert_eq!(
-            "ㄴㅃㅎ".to_string(),
+            "ㄴㅃㅎ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄴ', 'ㅎ'], &order, false).unwrap()
         );
         assert_eq!(
-            "ㄴㅃㅎ".to_string(),
+            "ㄴㅃㅎ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄴ', 'ㅎ', 'ㅎ', 'ㅃ'], &order, false).unwrap()
         );
         assert_eq!(
-            "ㄱㄲㄷㄸㄹㅁㅂㅅㅆㅇㅈㅉㅊㅋㅌㅍ".to_string(),
+            "ㄱㄲㄷㄸㄹㅁㅂㅅㅆㅇㅈㅉㅊㅋㅌㅍ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄴ', 'ㅎ'], &order, true).unwrap()
         );
         assert_eq!(
-            "ㄴㄷㄸㄹㅃㅎ".to_string(),
+            "ㄴㄷㄸㄹㅃㅎ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄴ', '-', 'ㄹ', 'ㅎ'], &order, false).unwrap()
         );
         assert_eq!(
-            "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".to_string(),
+            "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄱ', '-', 'ㅎ'], &order, false).unwrap()
         );
         assert_eq!(
-            "ㄱㄲㅁㅂㅅㅆㅇㅈㅉㅊㅋㅌㅍ".to_string(),
+            "ㄱㄲㅁㅂㅅㅆㅇㅈㅉㅊㅋㅌㅍ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㅃ', 'ㄴ', '-', 'ㄹ', 'ㅎ'], &order, true).unwrap()
         );
 
@@ -412,7 +421,7 @@ mod test {
 
         // 확인할 수 없는 문자열 있을 때 검사
         assert_eq!(
-            "ㄴㄷㄸㄹ".to_string(),
+            "ㄴㄷㄸㄹ".chars().collect::<Vec<char>>(),
             sanitize(vec!['ㄴ', '-', 'ㄹ', 'h', ' '], &order, false).unwrap()
         );
         match sanitize(vec!['ㄴ', '-', 'h'], &order, false).unwrap_err() {
@@ -422,11 +431,11 @@ mod test {
 
         // 빈 문자열 검사
         assert_eq!(
-            "".to_string(),
+            "".chars().collect::<Vec<char>>(),
             sanitize(Vec::<char>::new(), &order, false).unwrap()
         );
         assert_eq!(
-            "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".to_string(),
+            "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".chars().collect::<Vec<char>>(),
             sanitize(Vec::<char>::new(), &order, true).unwrap()
         );
 
@@ -444,38 +453,38 @@ mod test {
     fn test_convert_phoneme_to_syllable() {
         assert_eq!(
             '둳',
-            convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('ㄷ'), &Order::Default.compile())
+            convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('ㄷ'), Order::Default.order())
                 .unwrap()
         );
         assert_eq!(
             '둬',
-            convert_phonemes_to_syllable('ㄷ', 'ㅝ', None, &Order::Default.compile()).unwrap()
+            convert_phonemes_to_syllable('ㄷ', 'ㅝ', None, Order::Default.order()).unwrap()
         );
-        match convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('d'), &Order::Default.compile())
+        match convert_phonemes_to_syllable('ㄷ', 'ㅝ', Some('d'), Order::Default.order())
             .unwrap_err()
         {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('d', syllable),
             _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㄷ', 'f', Some('ㅇ'), &Order::Default.compile())
+        match convert_phonemes_to_syllable('ㄷ', 'f', Some('ㅇ'), Order::Default.order())
             .unwrap_err()
         {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('f', syllable),
             _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㄷ', 'ㄷ', Some('ㅇ'), &Order::Default.compile())
+        match convert_phonemes_to_syllable('ㄷ', 'ㄷ', Some('ㅇ'), Order::Default.order())
             .unwrap_err()
         {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('ㄷ', syllable),
             _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('ㅏ', 'ㅏ', Some('ㅇ'), &Order::Default.compile())
+        match convert_phonemes_to_syllable('ㅏ', 'ㅏ', Some('ㅇ'), Order::Default.order())
             .unwrap_err()
         {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('ㅏ', syllable),
             _ => panic!("Shoud raise InvalidPhonemeError"),
         };
-        match convert_phonemes_to_syllable('e', 'ㅏ', Some('ㅇ'), &Order::Default.compile())
+        match convert_phonemes_to_syllable('e', 'ㅏ', Some('ㅇ'), Order::Default.order())
             .unwrap_err()
         {
             KoreanRegexError::InvalidPhonemeError(_, syllable) => assert_eq!('e', syllable),
@@ -488,59 +497,59 @@ mod test {
         let order = Order::Default;
 
         assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", order, false).unwrap());
         assert_eq!(
             "가긔기다듸디아의이차츼치",
-            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order, false).unwrap()
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", order, false).unwrap()
         );
 
         assert_eq!(
             "다닥닦닧단닩닪닫달닭닮닯닰닱닲닳담답닶닷닸당닺닻닼닽닾닿",
-            substitute("ㄷ", "ㅏ", "", &order, false).unwrap()
+            substitute("ㄷ", "ㅏ", "", order, false).unwrap()
         );
         assert_eq!(
             "닿댛댷덓덯뎋뎧돃돟돻됗됳둏둫뒇뒣뒿듛듷딓딯",
-            substitute("ㄷ", "", "ㅎ", &order, false).unwrap()
+            substitute("ㄷ", "", "ㅎ", order, false).unwrap()
         );
         assert_eq!(
             "갛깧낳닿땋랗맣밯빻샇쌓앟잫짷챃캏탛팧핳",
-            substitute("", "ㅏ", "ㅎ", &order, false).unwrap()
+            substitute("", "ㅏ", "ㅎ", order, false).unwrap()
         );
 
         assert_eq!(
             "ㄱㄷㅇㅊ",
-            substitute("ㄱㄷㅊㅇ", "0", "0", &order, false).unwrap()
+            substitute("ㄱㄷㅊㅇ", "0", "0", order, false).unwrap()
         );
         assert_eq!(
             "ㅏㅗㅢ",
-            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order, false).unwrap()
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", order, false).unwrap()
         );
         assert_eq!(
             "ㄼㅅㅆㅇ",
-            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order, false).unwrap()
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", order, false).unwrap()
         );
 
         // hyphen 대체 테스트
         assert_eq!(
             "가-깋라-맇바-빟",
-            substitute("ㄱㄹㅂ", "", "", &order, true).unwrap()
+            substitute("ㄱㄹㅂ", "", "", order, true).unwrap()
         );
         assert_eq!(
             "강당항",
-            substitute("ㄱㄷㅎ", "ㅏ", "ㅇ", &order, true).unwrap()
+            substitute("ㄱㄷㅎ", "ㅏ", "ㅇ", order, true).unwrap()
         );
         assert_eq!("가각갋갖긔긕긟긪기긱긻깆다닥닯닺듸듹딃딎디딕딟딪아악앏앚의읙읣읮이익읿잊차착찳찾츼츽칇칒치칙칣칮",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", order, false).unwrap());
 
-        match substitute("0", "0", "0", &order, false).unwrap_err() {
+        match substitute("0", "0", "0", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("0", "ㅏ", "ㅁ", &order, false).unwrap_err() {
+        match substitute("0", "ㅏ", "ㅁ", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
-            _ => panic!("Shoud raise InvalidZeroPatternError"),
+            _ => panic!("Shoud   raise InvalidZeroPatternError"),
         }
-        match substitute("ㅎ", "0", "ㅁ", &order, false).unwrap_err() {
+        match substitute("ㅎ", "0", "ㅁ", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
@@ -551,52 +560,52 @@ mod test {
         let order = Order::RegularFirst;
 
         assert_eq!("가각갖갋기긱깆긻긔긕긪긟다닥닺닯디딕딪딟듸듹딎딃아악앚앏이익잊읿의읙읮읣차착찾찳치칙칮칣츼츽칒칇",
-                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", &order, false).unwrap());
+                   substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "ㄱ(ㄹㅂ)ㅈ0", order, false).unwrap());
         assert_eq!(
             "가기긔다디듸아이의차치츼",
-            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", &order, false).unwrap()
+            substitute("ㄱㄷㅊㅇ", "ㅏㅣ(ㅡㅣ)", "0", order, false).unwrap()
         );
 
         assert_eq!(
             "다닥단닫달담답닷당닺닻닼닽닾닿닦닧닩닪닭닮닯닰닱닲닳닶닸",
-            substitute("ㄷ", "ㅏ", "", &order, false).unwrap()
+            substitute("ㄷ", "ㅏ", "", order, false).unwrap()
         );
         assert_eq!(
             "닿댷덯뎧돟둏둫듛듷딯댛덓뎋돃돻됗됳뒇뒣뒿딓",
-            substitute("ㄷ", "", "ㅎ", &order, false).unwrap()
+            substitute("ㄷ", "", "ㅎ", order, false).unwrap()
         );
         assert_eq!(
             "갛낳닿랗맣밯샇앟잫챃캏탛팧핳깧땋빻쌓짷",
-            substitute("", "ㅏ", "ㅎ", &order, false).unwrap()
+            substitute("", "ㅏ", "ㅎ", order, false).unwrap()
         );
 
         assert_eq!(
             "ㄱㄷㅇㅊ",
-            substitute("ㄱㄷㅊㅇ", "0", "0", &order, false).unwrap()
+            substitute("ㄱㄷㅊㅇ", "0", "0", order, false).unwrap()
         );
         assert_eq!(
             "ㅏㅗㅢ",
-            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", &order, false).unwrap()
+            substitute("0", "ㅏ(ㅡㅣ)ㅗ", "0", order, false).unwrap()
         );
         assert_eq!(
             "ㅅㅇㄼㅆ",
-            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", &order, false).unwrap()
+            substitute("0", "0", "ㅇ(ㄹㅂ)ㅅㅆ", order, false).unwrap()
         );
 
         assert_eq!(
             "가각간갇갈감갑갓강-갛갂갃갅갆갉-갏값갔",
-            &substitute("ㄱ", "ㅏ", "", &order, true).unwrap()
+            &substitute("ㄱ", "ㅏ", "", order, true).unwrap()
         );
 
-        match substitute("0", "0", "0", &order, false).unwrap_err() {
+        match substitute("0", "0", "0", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("0", "ㅏ", "ㅁ", &order, false).unwrap_err() {
+        match substitute("0", "ㅏ", "ㅁ", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
-        match substitute("ㅎ", "0", "ㅁ", &order, false).unwrap_err() {
+        match substitute("ㅎ", "0", "ㅁ", order, false).unwrap_err() {
             KoreanRegexError::InvalidZeroPatternError(_) => (),
             _ => panic!("Shoud raise InvalidZeroPatternError"),
         }
