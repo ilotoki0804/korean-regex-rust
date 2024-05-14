@@ -271,7 +271,7 @@ impl Default for Order {
 
 impl Order {
     /// (초성, 중성, 종성(+0))으로 이루어진 튜플을 반환합니다.
-    fn order(self) -> (&'static [char], &'static [char], &'static [char]) {
+    pub fn order(self) -> (&'static [char], &'static [char], &'static [char]) {
         match self {
             Order::Default => {
                 (&CHOSUNGS, &JUNGSUNGS, &JONGSUNGS)
